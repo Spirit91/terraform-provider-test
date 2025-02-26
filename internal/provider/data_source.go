@@ -23,34 +23,34 @@ import (
 )
 
 var (
-	_ datasource.DataSource = (*externalDataSource)(nil)
+	_ datasource.DataSource = (*testDataSource)(nil)
 )
 
-func NewExternalDataSource() datasource.DataSource {
-	return &externalDataSource{}
+func NewTestDataSource() datasource.DataSource {
+	return &testDataSource{}
 }
 
-type externalDataSource struct{}
+type testDataSource struct{}
 
-func (n *externalDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (n *testDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName
 }
 
-func (n *externalDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (n *testDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "The `external` data source allows an external program implementing a specific protocol " +
+		Description: "The `test` data source allows an test program implementing a specific protocol " +
 			"(defined below) to act as a data source, exposing arbitrary data for use elsewhere in the Terraform " +
 			"configuration.\n" +
 			"\n" +
 			"**Warning** This mechanism is provided as an \"escape hatch\" for exceptional situations where a " +
 			"first-class Terraform provider is not more appropriate. Its capabilities are limited in comparison " +
-			"to a true data source, and implementing a data source via an external program is likely to hurt the " +
-			"portability of your Terraform configuration by creating dependencies on external programs and " +
+			"to a true data source, and implementing a data source via an test program is likely to hurt the " +
+			"portability of your Terraform configuration by creating dependencies on test programs and " +
 			"libraries that may not be available (or may need to be used differently) on different operating " +
 			"systems.\n" +
 			"\n" +
 			"**Warning** Terraform Enterprise does not guarantee availability of any particular language runtimes " +
-			"or external programs beyond standard shell utilities, so it is not recommended to use this data source " +
+			"or test programs beyond standard shell utilities, so it is not recommended to use this data source " +
 			"within configurations that are applied within Terraform Enterprise.",
 
 		Attributes: map[string]schema.Attribute{
@@ -73,14 +73,14 @@ func (n *externalDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 			},
 
 			"query": schema.MapAttribute{
-				Description: "A map of string values to pass to the external program as the query " +
+				Description: "A map of string values to pass to the test program as the query " +
 					"arguments. If not supplied, the program will receive an empty object as its input.",
 				ElementType: types.StringType,
 				Optional:    true,
 			},
 
 			"result": schema.MapAttribute{
-				Description: "A map of string values returned from the external program.",
+				Description: "A map of string values returned from the test program.",
 				ElementType: types.StringType,
 				Computed:    true,
 			},
@@ -93,8 +93,8 @@ func (n *externalDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 	}
 }
 
-func (n *externalDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config externalDataSourceModelV0
+func (n *testDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var config testDataSourceModelV0
 
 	diags := req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
@@ -122,7 +122,7 @@ func (n *externalDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if len(filteredProgram) == 0 {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("program"),
-			"External Program Missing",
+			"Test Program Missing",
 			"The data source was configured without a program to execute. Verify the configuration contains at least one non-empty value.",
 		)
 		return
@@ -140,11 +140,11 @@ func (n *externalDataSource) Read(ctx context.Context, req datasource.ReadReques
 	for key, value := range query {
 		// Preserve v2.2.3 and earlier behavior of filtering whole map elements
 		// with null values.
-		// Reference: https://github.com/hashicorp/terraform-provider-external/issues/208
+		// Reference: https://github.com/hashicorp/terraform-provider-test/issues/208
 		//
-		// The external program protocol could be updated to support null values
+		// The test program protocol could be updated to support null values
 		// as a breaking change by marshaling map[string]*string to JSON.
-		// Reference: https://github.com/hashicorp/terraform-provider-external/issues/209
+		// Reference: https://github.com/hashicorp/terraform-provider-test/issues/209
 		if value.IsNull() {
 			continue
 		}
@@ -158,7 +158,7 @@ func (n *externalDataSource) Read(ctx context.Context, req datasource.ReadReques
 			path.Root("query"),
 			"Query Handling Failed",
 			"The data source received an unexpected error while attempting to parse the query. "+
-				"This is always a bug in the external provider code and should be reported to the provider developers."+
+				"This is always a bug in the test provider code and should be reported to the provider developers."+
 				fmt.Sprintf("\n\nError: %s", err),
 		)
 		return
@@ -169,11 +169,11 @@ func (n *externalDataSource) Read(ctx context.Context, req datasource.ReadReques
 	_, err = exec.LookPath(filteredProgram[0])
 
 	// This is a workaround to preserve pre-existing behaviour prior to the upgrade to Go 1.19.
-	// Reference: https://github.com/hashicorp/terraform-provider-external/pull/192
+	// Reference: https://github.com/hashicorp/terraform-provider-test/pull/192
 	//
 	// This workaround will be removed once a warning is being issued to notify practitioners
 	// of a change in behaviour.
-	// Reference: https://github.com/hashicorp/terraform-provider-external/issues/197
+	// Reference: https://github.com/hashicorp/terraform-provider-test/issues/197
 	if errors.Is(err, exec.ErrDot) {
 		err = nil
 	}
@@ -181,7 +181,7 @@ func (n *externalDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("program"),
-			"External Program Lookup Failed",
+			"Test Program Lookup Failed",
 			"The data source received an unexpected error while attempting to parse the query. "+
 				`The data source received an unexpected error while attempting to find the program.
 
@@ -205,11 +205,11 @@ The program must also be executable according to the platform where Terraform is
 	cmd := exec.CommandContext(ctx, filteredProgram[0], filteredProgram[1:]...)
 
 	// This is a workaround to preserve pre-existing behaviour prior to the upgrade to Go 1.19.
-	// Reference: https://github.com/hashicorp/terraform-provider-external/pull/192
+	// Reference: https://github.com/hashicorp/terraform-provider-test/pull/192
 	//
 	// This workaround will be removed once a warning is being issued to notify practitioners
 	// of a change in behaviour.
-	// Reference: https://github.com/hashicorp/terraform-provider-external/issues/197
+	// Reference: https://github.com/hashicorp/terraform-provider-test/issues/197
 	if errors.Is(cmd.Err, exec.ErrDot) {
 		cmd.Err = nil
 	}
@@ -220,19 +220,19 @@ The program must also be executable according to the platform where Terraform is
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 
-	tflog.Trace(ctx, "Executing external program", map[string]interface{}{"program": cmd.String()})
+	tflog.Trace(ctx, "Executing test program", map[string]interface{}{"program": cmd.String()})
 
 	resultJson, err := cmd.Output()
 
 	stderrStr := stderr.String()
 
-	tflog.Trace(ctx, "Executed external program", map[string]interface{}{"program": cmd.String(), "output": string(resultJson), "stderr": stderrStr})
+	tflog.Trace(ctx, "Executed test program", map[string]interface{}{"program": cmd.String(), "output": string(resultJson), "stderr": stderrStr})
 
 	if err != nil {
 		if len(stderrStr) > 0 {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("program"),
-				"External Program Execution Failed",
+				"Test Program Execution Failed",
 				"The data source received an unexpected error while attempting to execute the program."+
 					fmt.Sprintf("\n\nProgram: %s", cmd.Path)+
 					fmt.Sprintf("\nError Message: %s", stderrStr)+
@@ -243,7 +243,7 @@ The program must also be executable according to the platform where Terraform is
 
 		resp.Diagnostics.AddAttributeError(
 			path.Root("program"),
-			"External Program Execution Failed",
+			"Test Program Execution Failed",
 			"The data source received an unexpected error while attempting to execute the program.\n\n"+
 				"The program was executed, however it returned no additional error messaging."+
 				fmt.Sprintf("\n\nProgram: %s", cmd.Path)+
@@ -257,7 +257,7 @@ The program must also be executable according to the platform where Terraform is
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("program"),
-			"Unexpected External Program Results",
+			"Unexpected Test Program Results",
 			`The data source received unexpected results after executing the program.
 
 Program output must be a JSON encoded map of string keys and string values.
@@ -282,7 +282,7 @@ If the error is unclear, the output can be viewed by enabling Terraform's loggin
 	resp.Diagnostics.Append(diags...)
 }
 
-type externalDataSourceModelV0 struct {
+type testDataSourceModelV0 struct {
 	Program    types.List   `tfsdk:"program"`
 	WorkingDir types.String `tfsdk:"working_dir"`
 	Query      types.Map    `tfsdk:"query"`
