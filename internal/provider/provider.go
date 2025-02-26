@@ -20,7 +20,7 @@ func New() provider.Provider {
 type externalProvider struct{}
 
 func (p *externalProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "external"
+	resp.TypeName = "test"
 }
 
 func (p *externalProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
@@ -29,7 +29,7 @@ func (p *externalProvider) Configure(ctx context.Context, req provider.Configure
 
 func (p *externalProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewExternalDataSource,
+		NewTestDataSource,
 	}
 }
 
