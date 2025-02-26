@@ -1,82 +1,41 @@
+# Terraform Provider release workflow.
 name: Release
 
+# This GitHub action creates a release when a tag that matches the pattern
+# "v*" (e.g. v0.1.0) is created.
 on:
-  workflow_dispatch:
-    inputs:
-      versionNumber:
-        description: 'Release version number (v#.#.#)'
-        type: string
-        required: true
+  push:
+    tags:
+      - 'v*'
 
+# Releases need permissions to read and write the repository contents.
+# GitHub considers creating releases and uploading assets as writing contents.
 permissions:
-  contents: read # Changelog commit operations use service account PAT
+  contents: write
 
 jobs:
-  changelog-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.changelog-version.outputs.version }}
-    steps:
-      - id: changelog-version
-        run: echo "version=$(echo "${{ inputs.versionNumber }}" | cut -c 2-)" >> "$GITHUB_OUTPUT"
-
-  changelog:
-    needs: changelog-version
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-          # Avoid persisting GITHUB_TOKEN credentials as they take priority over our service account PAT for `git push` operations
-          # More details: https://github.com/actions/checkout/blob/b4626ce19ce1106186ddf9bb20e706842f11a7c3/adrs/0153-checkout-v2.md#persist-credentials
-          persist-credentials: false
-
-      - name: Batch changes
-        uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2.0.0
-        with:
-          version: latest
-          args: batch ${{ needs.changelog-version.outputs.version }}
-
-      - name: Merge changes
-        uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2.0.0
-        with:
-          version: latest
-          args: merge
-
-     
-  release-tag:
-    needs: changelog
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-          # Default input is the SHA that initially triggered the workflow. As we created a new commit in the previous job,
-          # to ensure we get the latest commit we use the ref for checkout: 'refs/heads/<branch_name>'
-          ref: ${{ github.ref }}
-          # Avoid persisting GITHUB_TOKEN credentials as they take priority over our service account PAT for `git push` operations
-          # More details: https://github.com/actions/checkout/blob/b4626ce19ce1106186ddf9bb20e706842f11a7c3/adrs/0153-checkout-v2.md#persist-credentials
-          persist-credentials: false
-
-
-  release-notes:
-    needs: [ changelog-version, changelog, release-tag ]
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.versionNumber }}
+          # Allow goreleaser to access older tag information.
           fetch-depth: 0
-
-      - name: Generate Release Notes
-        run: |
-          cd .changes
-          sed -e "1{/# /d;}" -e "2{/^$/d;}" ${{ needs.changelog-version.outputs.version }}.md > release-notes.txt
-
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
         with:
-          name: release-notes
-          path: ./.changes/release-notes.txt
-          retention-days: 1
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5 # v6.2.0
+        id: import_gpg
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@026299872805cb2db698e02dd7fb506a4da5122d # v6.2.0
+        with:
+          args: release --clean
+        env:
+          # GitHub sets the GITHUB_TOKEN secret automatically.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
