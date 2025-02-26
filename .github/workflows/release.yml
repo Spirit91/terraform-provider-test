@@ -46,8 +46,8 @@ jobs:
 
       - name: Git push changelog
         run: |
-          git config --global user.name "${{ vars.TF_DEVEX_CI_COMMIT_AUTHOR }}"
-          git config --global user.email "${{ vars.TF_DEVEX_CI_COMMIT_EMAIL }}"
+          git config --global user.name "Hugo FERREIRA"
+          git config --global user.email "spirit-91@orange.fr"
           git add .
           git commit -a -m "Update changelog"
           git push "https://${{ vars.TF_DEVEX_CI_COMMIT_AUTHOR }}:${{ secrets.TF_DEVEX_COMMIT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
