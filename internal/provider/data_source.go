@@ -6,13 +6,10 @@ package provider
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
