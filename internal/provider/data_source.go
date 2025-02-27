@@ -93,7 +93,7 @@ func (n *testDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 
 	// Préparation de l'exécution
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
 	if workingDir != "" {
 		cmd.Dir = workingDir
 	}
